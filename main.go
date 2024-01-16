@@ -237,7 +237,7 @@ func run(
 			},
 		},
 	)
-	// gateway service
+	// gateway service  启动gateway转发服务
 	lifecycle.Append(
 		fx.Hook{
 			OnStart: func(ctx context.Context) error {
@@ -327,6 +327,7 @@ func run(
 	})
 }
 
+// 开启web服务转发，重启gateway
 func reloadGateway(port string, route *http.ServeMux) error {
 	listener, err := net.Listen("tcp", net.JoinHostPort("", port))
 	if err != nil {
