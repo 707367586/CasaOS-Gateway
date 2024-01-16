@@ -33,6 +33,7 @@ func (m *ManagementRoute) GetRoute() *gin.Engine {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	//配置gin web 框架引擎
 	r := gin.Default()
 	r.Use(middleware.Cors())
 	r.Use(gzip.Gzip(gzip.DefaultCompression))
@@ -48,28 +49,38 @@ func (m *ManagementRoute) GetRoute() *gin.Engine {
 	return r
 }
 
+// buildV1Group 用于构建版本1的管理路由
 func (m *ManagementRoute) buildV1Group(r *gin.Engine) {
+	// 创建版本1的路由组
 	v1Group := r.Group("/v1")
 
+	// 使用中间件
 	v1Group.Use()
 	{
+		// 构建版本1的路由
 		m.buildV1RouteGroup(v1Group)
 	}
 }
 
+// buildV1RouteGroup 用于构建版本1的路由组
 func (m *ManagementRoute) buildV1RouteGroup(v1Group *gin.RouterGroup) {
+	// 创建子路由组
 	v1GatewayGroup := v1Group.Group("/gateway")
 
+	// 使用中间件
 	v1GatewayGroup.Use()
 	{
+		// 获取路由列表
 		v1GatewayGroup.GET("/routes", func(ctx *gin.Context) {
 			ctx.JSON(http.StatusOK, m.management.GetRoutes())
 		})
 
+		// 创建路由
 		v1GatewayGroup.POST("/routes",
 			jwt.ExceptLocalhost(func() (*ecdsa.PublicKey, error) { return external.GetPublicKey(m.management.State.GetRuntimePath()) }),
 			func(ctx *gin.Context) {
 				var route *model.Route
+				//json绑定实体类的方法
 				err := ctx.ShouldBindJSON(&route)
 				if err != nil {
 					ctx.JSON(http.StatusBadRequest, model.Result{
@@ -90,6 +101,7 @@ func (m *ManagementRoute) buildV1RouteGroup(v1Group *gin.RouterGroup) {
 				ctx.Status(http.StatusCreated)
 			})
 
+		// 获取端口号
 		v1GatewayGroup.GET("/port", func(ctx *gin.Context) {
 			ctx.JSON(http.StatusOK, model.Result{
 				Success: common_err.SUCCESS,
@@ -98,6 +110,7 @@ func (m *ManagementRoute) buildV1RouteGroup(v1Group *gin.RouterGroup) {
 			})
 		})
 
+		// 修改端口号
 		v1GatewayGroup.PUT("/port",
 			jwt.ExceptLocalhost(func() (*ecdsa.PublicKey, error) { return external.GetPublicKey(m.management.State.GetRuntimePath()) }),
 			func(ctx *gin.Context) {

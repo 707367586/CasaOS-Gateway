@@ -61,18 +61,18 @@ func init() {
 
 	_state = service.NewState()
 
-	// create default config file if not exist
+	//如果不存在，则创建默认配置文件
 	ConfigFilePath := filepath.Join(constants.DefaultConfigPath, common.GatewayName+"."+common.GatewayConfigType)
 	if _, err := os.Stat(ConfigFilePath); os.IsNotExist(err) {
 		fmt.Println("config file not exist, create it")
-		// create config file
+		//创建配置文件
 		file, err := os.Create(ConfigFilePath)
 		if err != nil {
 			panic(err)
 		}
 		defer file.Close()
 
-		// write default config
+		//写入默认配置
 		_, err = file.WriteString(_confSample)
 		if err != nil {
 			panic(err)
@@ -185,25 +185,31 @@ func run(
 	gatewayRoute *route.GatewayRoute,
 	staticRoute *route.StaticRoute,
 ) {
+	//从这开始利用fx依赖注入 开始注册网关
 	// management server
 	lifecycle.Append(
 		fx.Hook{
 			OnStart: func(context.Context) error {
+				// 创建一个TCP监听器
 				listener, err := net.Listen("tcp", net.JoinHostPort(localhost, "0"))
 				if err != nil {
 					return err
 				}
 
+				// 创建一个管理服务的HTTP服务器
 				managementServer := &http.Server{
+					// Handler: 指定处理请求的处理器，此处使用了managementRoute.GetRoute()返回的处理函数。
 					Handler:           managementRoute.GetRoute(),
 					ReadHeaderTimeout: 5 * time.Second,
 				}
 
+				// 将监听器的地址写入文件
 				urlFilePath, err := writeAddressFile(_state.GetRuntimePath(), external.ManagementURLFilename, "http://"+listener.Addr().String())
 				if err != nil {
 					return err
 				}
 
+				// 启动一个goroutine来运行管理服务
 				go func() {
 					logger.Info("Management service is listening...",
 						zap.Any("address", listener.Addr().String()),
@@ -216,6 +222,7 @@ func run(
 					}
 				}()
 
+				// 创建一个路由到"/v1/gateway/port"，目标为管理服务的地址
 				if err := management.CreateRoute(&model.Route{
 					Path:   "/v1/gateway/port",
 					Target: "http://" + listener.Addr().String(),
@@ -223,13 +230,13 @@ func run(
 					return err
 				}
 
+				// 发送一个空值到"_managementServiceReady"通道
 				_managementServiceReady <- struct{}{}
 
 				return nil
 			},
 		},
 	)
-
 	// gateway service
 	lifecycle.Append(
 		fx.Hook{

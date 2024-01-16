@@ -8,6 +8,7 @@ type State struct {
 	wwwPath     string
 }
 
+// 当前网关状态
 func NewState() *State {
 	return &State{
 		gatewayPort:         "",

@@ -16,6 +16,7 @@ import (
 
 const RoutesFile = "routes.json"
 
+// 该类为路由管理器（映射等）
 type Management struct {
 	pathTargetMap       map[string]string
 	pathReverseProxyMap map[string]*httputil.ReverseProxy
@@ -51,17 +52,23 @@ func NewManagementService(state *State) *Management {
 	}
 }
 
+// CreateRoute 用于创建路由
 func (g *Management) CreateRoute(route *model.Route) error {
+	// 解析路由目标地址
 	url, err := url.Parse(route.Target)
 	if err != nil {
 		return err
 	}
 
+	// 将路径与目标地址映射关系保存到pathTargetMap中
 	g.pathTargetMap[route.Path] = route.Target
+	// 创建反向代理，并将代理对象保存到pathReverseProxyMap中
 	g.pathReverseProxyMap[route.Path] = httputil.NewSingleHostReverseProxy(url)
 
+	// 拼接保存路由映射文件的路径
 	routesFilePath := filepath.Join(g.State.GetRuntimePath(), RoutesFile)
 
+	// 将路径目标映射关系保存到文件中
 	err = savePathTargetMapTo(routesFilePath, g.pathTargetMap)
 	if err != nil {
 		return err
