@@ -43,6 +43,10 @@ var (
 	ErrCheckURLNotOK = errors.New("check url did not return 200 OK")
 
 	//go:embed build/sysroot/etc/casaos/gateway.ini.sample
+	// [common]
+	// runtimepath=/var/run/casaos
+	// [gateway]
+	// port=
 	_confSample string
 )
 
@@ -61,47 +65,58 @@ func init() {
 
 	_state = service.NewState()
 
-	//如果不存在，则创建默认配置文件
+	// create default config file if not exist
+	// /etc/casaos/gateway.ini
+	// [common]
+	// runtimepath=/var/run/casaos
+
+	// [gateway]
+	// logfileext=log
+	// logpath=/var/log/casaos
+	// logsavename=gateway
+	// port=80
+	// wwwpath=/var/lib/casaos/www
 	ConfigFilePath := filepath.Join(constants.DefaultConfigPath, common.GatewayName+"."+common.GatewayConfigType)
+	// 判断文件是否存在，不存在则创建它
 	if _, err := os.Stat(ConfigFilePath); os.IsNotExist(err) {
 		fmt.Println("config file not exist, create it")
-		//创建配置文件
+		// 创建配置文件
 		file, err := os.Create(ConfigFilePath)
 		if err != nil {
 			panic(err)
 		}
 		defer file.Close()
 
-		//写入默认配置
+		// 写入默认配置
 		_, err = file.WriteString(_confSample)
 		if err != nil {
 			panic(err)
 		}
 	}
-
+	// 加载config文件
 	config, err := common.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
-
+	// 初始化 /var/log/casaos/gateway.log文件
 	logger.LogInit(
 		config.GetString(common.ConfigKeyLogPath),
 		config.GetString(common.ConfigKeyLogSaveName),
 		config.GetString(common.ConfigKeyLogFileExt),
 	)
-
+	// 获取运行路径 /var/run/casaos
 	runtimePath := config.GetString(common.ConfigKeyRuntimePath)
 	if err := _state.SetRuntimePath(runtimePath); err != nil {
 		logger.Error("Failed to set runtime path", zap.Any("error", err), zap.Any(common.ConfigKeyRuntimePath, runtimePath))
 		panic(err)
 	}
-
+	// 获取gateway端口号80
 	gatewayPort := config.GetString(common.ConfigKeyGatewayPort)
 	if err := _state.SetGatewayPort(gatewayPort); err != nil {
 		logger.Error("Failed to set gateway port", zap.Any("error", err), zap.Any(common.ConfigKeyGatewayPort, gatewayPort))
 		panic(err)
 	}
-
+	// 设置www path
 	if err := _state.SetWWWPath(*wwwPathFlag); err != nil {
 		logger.Error("Failed to set www path", zap.Any("error", err), zap.String("wwwpath", *wwwPathFlag))
 		panic(err)
@@ -126,7 +141,7 @@ func main() {
 		logger.Error("Failed to write pid file to runtime path", zap.Any("error", err), zap.Any("runtimePath", _state.GetRuntimePath()))
 		panic(err)
 	}
-
+	// 程序退出前删除/var/run/casaos下的gateway.pid，management.url，static.url
 	defer cleanupFiles(
 		_state.GetRuntimePath(),
 		pidFilename, external.ManagementURLFilename, external.StaticURLFilename,
@@ -139,19 +154,19 @@ func main() {
 			}
 		}
 	}()
-
+	// 创建ctx，启动杀进程监听
 	ctx, cancel := context.WithCancel(context.Background())
 	kill := make(chan os.Signal, 1)
 	signal.Notify(kill, syscall.SIGTERM, syscall.SIGINT)
-
+	// 如果得到杀死进程的信号，则调用cancel
 	go func() {
 		<-kill
 		cancel()
 	}()
 
 	go func() {
-		<-_managementServiceReady
-		<-_gatewayServiceReady
+		<-_managementServiceReady // 阻塞等到managementService ready
+		<-_gatewayServiceReady    // 阻塞等到gatewayService ready
 
 		if supported, err := daemon.SdNotify(false, daemon.SdNotifyReady); err != nil {
 			logger.Error("Failed to notify systemd that gateway is ready", zap.Any("error", err))
@@ -161,7 +176,7 @@ func main() {
 			logger.Info("This process is not running as a systemd service.")
 		}
 	}()
-
+	// 依赖注入
 	app := fx.New(
 		fx.Provide(func() *service.State { return _state }),
 		fx.Provide(service.NewManagementService),
@@ -185,7 +200,7 @@ func run(
 	gatewayRoute *route.GatewayRoute,
 	staticRoute *route.StaticRoute,
 ) {
-	//从这开始利用fx依赖注入 开始注册网关
+	// 从这开始利用fx依赖注入 开始注册网关
 	// management server
 	lifecycle.Append(
 		fx.Hook{
@@ -290,7 +305,7 @@ func run(
 			},
 		})
 
-	// static web
+	// static web 访问web资源，跳转ui页面，/var/lib/casaos/www下的静态页面是Casaos-UI编译得到
 	lifecycle.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			listener, err := net.Listen("tcp", net.JoinHostPort(localhost, "0"))

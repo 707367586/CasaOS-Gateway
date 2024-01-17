@@ -85,8 +85,8 @@ func (g *GatewayRoute) GetRoute() *http.ServeMux {
 		// to fix https://github.com/IceWhaleTech/CasaOS/security/advisories/GHSA-32h8-rgcj-2g3c#event-102885
 		// API V1 and V2 both read ip from request header. So the fix is effective for v1 and v2.
 		rewriteRequestSourceIP(r)
-		//进行代理转发
-		proxy.ServeHTTP(w, r)
+		// 进行代理转发
+		proxy.ServeHTTP(w, r) // 创建反向代理
 	})
 
 	return gatewayMux

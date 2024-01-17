@@ -28,7 +28,7 @@ func NewManagementService(state *State) *Management {
 	routesFilepath := filepath.Join(state.GetRuntimePath(), RoutesFile)
 
 	// try to load routes from routes.json
-	pathTargetMap, err := loadPathTargetMapFrom(routesFilepath)
+	pathTargetMap, err := loadPathTargetMapFrom(routesFilepath) // 存储url->服务的映射
 	if err != nil {
 		logger.Error("Failed to load routes", zap.Any("error", err), zap.Any("filepath", routesFilepath))
 		pathTargetMap = make(map[string]string)
